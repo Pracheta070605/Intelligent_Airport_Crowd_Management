@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Intelligent Airport Crowd Management — Live Simulation</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root{
+  --bg:#F6F7F9;
+  --panel:#FFFFFF;
+  --panel-2:#F1F3F6;
+  --border:#E2E6EC;
+  --text:#1A1F29;
+  --muted:#68707F;
+  --dim:#9AA2B1;
+  --cyan:#0EA5A0;
+  --cyan-dim:rgba(14,165,160,0.10);
+  --green:#16A34A;
+  --amber:#D97706;
+  --red:#DC2626;
+  --green-dim:rgba(22,163,74,0.10);
+  --amber-dim:rgba(217,119,6,0.10);
+  --red-dim:rgba(220,38,38,0.10);
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+html,body{background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; min-height:100%;}
+body{
+  padding:22px;
+  background:
+    radial-gradient(circle at 15% 0%, rgba(14,165,160,0.05), transparent 40%),
+    radial-gradient(circle at 100% 100%, rgba(220,38,38,0.04), transparent 45%),
+    var(--bg);
+}
+.wrap{max-width:1280px; margin:0 auto;}
+
+/* ---------- header ---------- */
+header{
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  flex-wrap:wrap;
+  padding-bottom:16px; margin-bottom:18px;
+  border-bottom:1px solid var(--border);
+}
+.brand{display:flex; align-items:center; gap:12px;}
+.brand-mark{
+  width:38px; height:38px; border-radius:9px;
+  background:linear-gradient(135deg, var(--cyan), #0B7C78);
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Inter',sans-serif; font-weight:700; color:#FFFFFF; font-size:15px;
+  flex-shrink:0;
+}
+.brand h1{
+  font-family:'Inter',sans-serif; font-weight:600; font-size:16px; letter-spacing:0.4px;
+  color:var(--text);
+}
+.brand .sub{font-size:11px; color:var(--muted); letter-spacing:0.3px; margin-top:2px;}
+.head-right{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+.pill{
+  display:flex; align-items:center; gap:6px;
+  padding:6px 11px; border-radius:20px; font-size:11px; letter-spacing:0.3px;
+  background:var(--panel-2); border:1px solid var(--border); color:var(--muted);
+}
+.dot{width:6px; height:6px; border-radius:50%; background:var(--green); box-shadow:0 0 6px var(--green);}
+.dot.pulse{animation:pulse 1.6s infinite;}
+@keyframes pulse{0%,100%{opacity:1;} 50%{opacity:0.35;}}
+#simClock{color:var(--cyan); font-weight:600;}
+#sysStatusPill{font-weight:600; letter-spacing:0.6px;}
+#sysStatusPill.LOW{color:var(--green); border-color:rgba(22,163,74,0.3); background:var(--green-dim);}
+#sysStatusPill.MEDIUM{color:var(--amber); border-color:rgba(217,119,6,0.3); background:var(--amber-dim);}
+#sysStatusPill.CRITICAL{color:var(--red); border-color:rgba(220,38,38,0.4); background:var(--red-dim);}
+
+/* ---------- layout ---------- */
+.grid{display:grid; grid-template-columns:1.55fr 1fr; gap:18px;}
+@media (max-width:920px){ .grid{grid-template-columns:1fr;} }
+
+.card{
+  background:var(--panel); border:1px solid var(--border); border-radius:14px;
+  padding:16px 18px 18px;
+  box-shadow:0 1px 2px rgba(16,24,40,0.04);
+}
+.card + .card{margin-top:18px;}
+.card-head{
+  display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;
+}
+.card-title{
+  font-family:'Inter',sans-serif; font-size:12px; font-weight:600;
+  letter-spacing:1.2px; color:var(--muted); text-transform:uppercase;
+}
+.src-row{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;}
+.src-pill{
+  font-size:10px; letter-spacing:0.3px; color:var(--dim); padding:5px 9px;
+  border:1px dashed var(--border); border-radius:8px; display:flex; gap:6px; align-items:center;
+}
+
+/* ---------- canvas map ---------- */
+.map-scroll{overflow-x:auto; padding-bottom:2px;}
+canvas#map{display:block; width:100%; min-width:640px; height:auto;}
+
+.legend{display:flex; gap:16px; margin-top:10px; flex-wrap:wrap;}
+.legend-item{display:flex; align-items:center; gap:6px; font-size:10.5px; color:var(--muted);}
+.legend-item .sw{width:9px; height:9px; border-radius:3px;}
+
+/* controls */
+.controls{display:flex; gap:8px; flex-wrap:wrap; margin-top:14px;}
+button{
+  font-family:'Inter',sans-serif; font-size:11px; letter-spacing:0.3px;
+  background:var(--panel-2); border:1px solid var(--border); color:var(--text);
+  padding:8px 12px; border-radius:8px; cursor:pointer; transition:border-color .15s, color .15s;
+}
+button:hover{border-color:var(--cyan); color:var(--cyan);}
+button.active{border-color:var(--cyan); color:var(--cyan); background:var(--cyan-dim);}
+button.warn:hover{border-color:var(--red); color:var(--red);}
+.spacer{flex:1;}
+
+/* ---------- crowd monitor list ---------- */
+.zone-row{
+  display:grid; grid-template-columns:16px 1fr auto; align-items:center; gap:10px;
+  padding:9px 4px; border-bottom:1px solid var(--border);
+}
+.zone-row:last-child{border-bottom:none;}
+.zone-row .dotstat{width:9px; height:9px; border-radius:50%;}
+.zone-name{font-family:'Inter',sans-serif; font-size:12.5px; font-weight:500;}
+.zone-bar-wrap{height:5px; background:#E8EAEE; border-radius:4px; margin-top:6px; overflow:hidden;}
+.zone-bar{height:100%; border-radius:4px; transition:width .4s ease;}
+.zone-meta{font-size:10.5px; color:var(--muted); margin-top:4px;}
+.zone-num{text-align:right; font-size:13px; font-weight:600;}
+.zone-status{font-size:9.5px; letter-spacing:0.6px; text-align:right; margin-top:3px;}
+.LOW-c{color:var(--green);} .MEDIUM-c{color:var(--amber);} .CRITICAL-c{color:var(--red);}
+.LOW-bg{background:var(--green);} .MEDIUM-bg{background:var(--amber);} .CRITICAL-bg{background:var(--red);}
+
+/* ---------- priority / stats ---------- */
+.stat-big{
+  display:flex; justify-content:space-between; align-items:baseline;
+  padding:10px 0; border-bottom:1px solid var(--border);
+}
+.stat-big:last-child{border-bottom:none;}
+.stat-label{font-size:11px; color:var(--muted); letter-spacing:0.3px;}
+.stat-value{font-size:15px; font-weight:600;}
+#priorityName{font-family:'Inter',sans-serif; font-weight:700; font-size:15px;}
+#sparkWrap{margin-top:10px;}
+canvas#spark{width:100%; height:46px; display:block;}
+
+/* ---------- decision log ---------- */
+#log{display:flex; flex-direction:column; gap:8px; max-height:230px; overflow-y:auto; padding-right:4px;}
+#log::-webkit-scrollbar{width:5px;}
+#log::-webkit-scrollbar-thumb{background:var(--border); border-radius:4px;}
+.log-entry{
+  display:flex; gap:9px; align-items:flex-start; font-size:11px; line-height:1.45;
+  padding:8px 10px; background:var(--panel-2); border:1px solid var(--border); border-radius:8px;
+  animation:slideIn .3s ease;
+}
+@keyframes slideIn{from{opacity:0; transform:translateY(-4px);} to{opacity:1; transform:translateY(0);}}
+.log-time{color:var(--dim); flex-shrink:0; font-size:10px; padding-top:1px;}
+.log-icon{flex-shrink:0;}
+.log-empty{color:var(--dim); font-size:11px; padding:10px 2px;}
+
+.action-tally{display:flex; gap:14px; margin-top:12px; padding-top:12px; border-top:1px solid var(--border); flex-wrap:wrap;}
+.tally-item{font-size:10.5px; color:var(--muted); display:flex; gap:6px; align-items:center;}
+.tally-item b{color:var(--text); font-size:12px;}
+
+footer{margin-top:20px; text-align:center; font-size:10.5px; color:var(--dim); letter-spacing:0.3px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="brand-mark">AI</div>
+      <div>
+        <h1>INTELLIGENT AIRPORT CROWD MANAGEMENT</h1>
+        <div class="sub">CV density · ML arrival forecast · SUMO-style flow simulation</div>
+      </div>
+    </div>
+    <div class="head-right">
+      <div class="pill"><span class="dot pulse" id="engineDot"></span><span>DECISION ENGINE ACTIVE</span></div>
+      <div class="pill">SIM TIME <span id="simClock">14:00</span></div>
+      <div class="pill" id="sysStatusPill">SYSTEM: NOMINAL</div>
+    </div>
+  </header>
+
+  <div class="grid">
+
+    <!-- LEFT: terminal map + controls -->
+    <div>
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">Terminal Flow Map — Live</div>
+        </div>
+        <div class="src-row">
+          <div class="src-pill">📹 CCTV → YOLO density model</div>
+          <div class="src-pill">✈ Flight data → arrival prediction model</div>
+          <div class="src-pill">🧭 SUMO-style passenger movement</div>
+        </div>
+        <div class="map-scroll"><canvas id="map" width="1040" height="290"></canvas></div>
+        <div class="legend">
+          <div class="legend-item"><span class="sw" style="background:var(--green)"></span>Low</div>
+          <div class="legend-item"><span class="sw" style="background:var(--amber)"></span>Medium</div>
+          <div class="legend-item"><span class="sw" style="background:var(--red)"></span>Critical</div>
+          <div class="legend-item"><span class="sw" style="background:var(--cyan)"></span>Passenger flow</div>
+        </div>
+        <div class="controls">
+          <button id="btnPlay">⏸ Pause</button>
+          <button class="speedBtn active" data-speed="1">1×</button>
+          <button class="speedBtn" data-speed="2">2×</button>
+          <button class="speedBtn" data-speed="4">4×</button>
+          <div class="spacer"></div>
+          <button id="btnSurge">✈ Simulate Flight Surge</button>
+          <button id="btnReset" class="warn">↺ Reset</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div class="card-title">AI Decision Engine — Action Log</div></div>
+        <div id="log"><div class="log-empty">Monitoring zones… actions will appear here.</div></div>
+        <div class="action-tally">
+          <div class="tally-item">🚦 Lanes opened <b id="tLane">0</b></div>
+          <div class="tally-item">↪ Redirects <b id="tRedirect">0</b></div>
+          <div class="tally-item">👥 Staff calls <b id="tStaff">0</b></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: monitor panel -->
+    <div>
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">Airport Crowd Monitor</div>
+          <div style="font-size:10px; color:var(--dim)">updates live</div>
+        </div>
+        <div id="zoneList"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div class="card-title">Priority Zone</div></div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span id="priorityName">—</span>
+          <span id="priorityStatus" class="zone-status" style="font-size:11px;">—</span>
+        </div>
+        <div class="stat-big"><span class="stat-label">Occupancy</span><span class="stat-value" id="pOcc">—</span></div>
+        <div class="stat-big"><span class="stat-label">Average waiting time</span><span class="stat-value" id="pWait">—</span></div>
+        <div class="stat-big"><span class="stat-label">Predicted in 30 min</span><span class="stat-value" id="pPred">—</span></div>
+        <div id="sparkWrap">
+          <div style="font-size:10px; color:var(--dim); margin-bottom:4px;">TREND (last ~24 min)</div>
+          <canvas id="spark" width="400" height="46"></canvas>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>Simulated data — no live camera or flight feed connected. Passenger counts are generated by an in-browser queueing simulation.</footer>
+</div>
+
+<script>
+(function(){
+  // ---------------- config ----------------
+  const SIM_MIN_PER_REAL_SEC = 0.5;   // simulated minutes per real second at 1x
+  const LOW_T = 0.45, CRIT_T = 0.80;
+  const statusColor = {LOW:'#16A34A', MEDIUM:'#D97706', CRITICAL:'#DC2626'};
+
+  function statusOf(occ){
+    if(occ >= CRIT_T) return 'CRITICAL';
+    if(occ >= LOW_T) return 'MEDIUM';
+    return 'LOW';
+  }
+
+  // ---------------- zones ----------------
+  const zones = [
+    {key:'entrance',    name:'Entrance',    capacity:250, base:18, queue:38,  icon:'entrance'},
+    {key:'checkin',     name:'Check-in',    capacity:200, base:14, queue:108, icon:'checkin'},
+    {key:'security',    name:'Security',    capacity:200, base:9,  queue:187, icon:'security'},
+    {key:'immigration', name:'Immigration', capacity:150, base:11, queue:32,  icon:'immigration'},
+    {key:'gate',        name:'Gate A12',    capacity:120, base:13, queue:58,  icon:'gate'},
+  ];
+  zones.forEach(z=>{
+    z.boostMult = 1; z.boostUntil = 0; z.lastActionTime = -999; z.lastActionType = null;
+    z.divertFactor = 0; z.divertUntil = 0;
+    z.history = []; // {t, occ}
+  });
+
+  let t = 14*60;           // sim clock in minutes from midnight, start 14:00
+  let boarded = 0, redirectedTotal = 0;
+  let playing = true, speed = 1;
+  let surgeUntil = 0;
+  const actionCounts = {lane:0, redirect:0, staff:0};
+  let lastAction = null;
+
+  function effectiveService(z){
+    const boosted = t < z.boostUntil ? z.boostMult : 1;
+    return z.base * boosted;
+  }
+  function arrivalRateEntrance(){
+    let base = 15 + 6*Math.sin(t/45) + (Math.random()-0.5)*2.5;
+    if(t < surgeUntil) base *= 2.6;
+    return Math.max(3, base);
+  }
+
+  function pushLog(icon, text){
+    const wrap = document.getElementById('log');
+    if(wrap.querySelector('.log-empty')) wrap.innerHTML='';
+    const hh = String(Math.floor(t/60)%24).padStart(2,'0');
+    const mm = String(Math.floor(t%60)).padStart(2,'0');
+    const el = document.createElement('div');
+    el.className='log-entry';
+    el.innerHTML = `<span class="log-time">${hh}:${mm}</span><span class="log-icon">${icon}</span><span>${text}</span>`;
+    wrap.prepend(el);
+    while(wrap.children.length>8) wrap.removeChild(wrap.lastChild);
+  }
+
+  function maybeTriggerAction(z){
+    const occ = z.queue / z.capacity;
+    if(occ < CRIT_T) return;
+    if(t < z.boostUntil || t < z.divertUntil) return;
+    if(t - z.lastActionTime < 6) return;
+
+    const options = ['lane','redirect','staff'].filter(o=>o!==z.lastActionType);
+    const action = options[Math.floor(Math.random()*options.length)];
+    z.lastActionTime = t; z.lastActionType = action; lastAction = {zone:z.key, t};
+    actionCounts[action]++;
+    document.getElementById(action==='lane'?'tLane':action==='redirect'?'tRedirect':'tStaff').textContent =
+      actionCounts[action];
+
+    if(action==='lane'){
+      z.boostMult = Math.max(z.boostMult, 1.5); z.boostUntil = Math.max(z.boostUntil, t+10);
+      pushLog('🚦', `Opened an additional lane at <b>${z.name}</b> — throughput +50% for 10 min.`);
+      z.flash = {type:'lane', until:t+10};
+    } else if(action==='staff'){
+      z.boostMult = Math.max(z.boostMult, 1.3); z.boostUntil = Math.max(z.boostUntil, t+15);
+      pushLog('👥', `Allocated extra staff to <b>${z.name}</b> — throughput +30% for 15 min.`);
+      z.flash = {type:'staff', until:t+15};
+    } else {
+      z.divertFactor = 0.35; z.divertUntil = t+8;
+      z.queue = Math.max(0, z.queue*0.82);
+      pushLog('↪', `Redirecting arrivals away from <b>${z.name}</b> — 35% diverted to an alternate checkpoint for 8 min.`);
+      z.flash = {type:'redirect', until:t+8};
+    }
+  }
+
+  // ---------------- simulation tick ----------------
+  function tick(dt){
+    // entrance external arrivals
+    zones[0].queue += arrivalRateEntrance()*dt;
+
+    let carry = 0;
+    for(let i=0;i<zones.length;i++){
+      const z = zones[i];
+      // apply inbound transfer from previous zone (with possible diversion)
+      if(i>0){
+        let inbound = carry;
+        if(t < z.divertUntil){
+          const diverted = inbound * z.divertFactor;
+          redirectedTotal += diverted;
+          inbound -= diverted;
+        }
+        z.queue += inbound;
+      }
+      const processed = Math.min(z.queue, effectiveService(z)*dt);
+      z.queue -= processed;
+      carry = processed;
+    }
+    boarded += carry; // whatever leaves the last zone (gate) has boarded
+
+    t += dt;
+
+    zones.forEach(z=>{
+      const occ = z.queue / z.capacity;
+      z.history.push({t, occ});
+      if(z.history.length>240) z.history.shift();
+      maybeTriggerAction(z);
+    });
+  }
+
+  // ---------------- prediction ----------------
+  function predict30(z){
+    const h = z.history;
+    if(h.length<6) return z.queue;
+    const recent = h.slice(-24);
+    const n = recent.length;
+    const t0 = recent[0].t;
+    let sx=0,sy=0,sxy=0,sxx=0;
+    recent.forEach(p=>{
+      const x = p.t - t0, y = p.occ*z.capacity;
+      sx+=x; sy+=y; sxy+=x*y; sxx+=x*x;
+    });
+    const denom = (n*sxx - sx*sx) || 1;
+    const slope = (n*sxy - sx*sy)/denom;
+    const projected = z.queue + slope*30;
+    return Math.max(0, Math.min(z.capacity*1.6, projected));
+  }
+
+  // ---------------- rendering: zone list ----------------
+  function renderZoneList(){
+    const wrap = document.getElementById('zoneList');
+    wrap.innerHTML='';
+    zones.forEach(z=>{
+      const occ = z.queue/z.capacity;
+      const st = statusOf(occ);
+      const wait = (z.queue/Math.max(0.5,effectiveService(z))).toFixed(0);
+      const row = document.createElement('div');
+      row.className='zone-row';
+      row.innerHTML = `
+        <div class="dotstat ${st}-bg"></div>
+        <div>
+          <div class="zone-name">${z.name}</div>
+          <div class="zone-bar-wrap"><div class="zone-bar ${st}-bg" style="width:${Math.min(100,occ*100)}%"></div></div>
+          <div class="zone-meta">~${wait} min wait</div>
+        </div>
+        <div>
+          <div class="zone-num">${Math.round(z.queue)}/${z.capacity}</div>
+          <div class="zone-status ${st}-c">${st}</div>
+        </div>`;
+      wrap.appendChild(row);
+    });
+  }
+
+  function renderPriority(){
+    let worst = zones[0];
+    zones.forEach(z=>{ if(z.queue/z.capacity > worst.queue/worst.capacity) worst = z; });
+    const occ = worst.queue/worst.capacity;
+    const st = statusOf(occ);
+    document.getElementById('priorityName').textContent = worst.name.toUpperCase();
+    const ps = document.getElementById('priorityStatus');
+    ps.textContent = st; ps.className = 'zone-status '+st+'-c';
+    document.getElementById('pOcc').textContent = `${Math.round(worst.queue)} / ${worst.capacity}`;
+    document.getElementById('pWait').textContent = `${(worst.queue/Math.max(0.5,effectiveService(worst))).toFixed(0)} min`;
+    document.getElementById('pPred').textContent = `${Math.round(predict30(worst))}`;
+    drawSpark(worst);
+    return {worst, st};
+  }
+
+  function drawSpark(z){
+    const c = document.getElementById('spark');
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0,0,c.width,c.height);
+    const h = z.history.slice(-48);
+    if(h.length<2) return;
+    const max = Math.max(z.capacity, ...h.map(p=>p.occ*z.capacity)) * 1.05;
+    ctx.beginPath();
+    h.forEach((p,i)=>{
+      const x = (i/(h.length-1))*c.width;
+      const y = c.height - (p.occ*z.capacity/max)*c.height;
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    });
+    ctx.strokeStyle = '#0EA5A0'; ctx.lineWidth=1.6; ctx.stroke();
+    ctx.lineTo(c.width,c.height); ctx.lineTo(0,c.height); ctx.closePath();
+    ctx.fillStyle='rgba(14,165,160,0.10)'; ctx.fill();
+    // capacity critical line
+    const critY = c.height - (CRIT_T*z.capacity/max)*c.height;
+    ctx.beginPath(); ctx.setLineDash([3,3]);
+    ctx.moveTo(0,critY); ctx.lineTo(c.width,critY);
+    ctx.strokeStyle='rgba(220,38,38,0.5)'; ctx.lineWidth=1; ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  function renderHeader(worstSt){
+    const hh = String(Math.floor(t/60)%24).padStart(2,'0');
+    const mm = String(Math.floor(t%60)).padStart(2,'0');
+    document.getElementById('simClock').textContent = `${hh}:${mm}`;
+    const pill = document.getElementById('sysStatusPill');
+    const labelMap = {LOW:'NOMINAL', MEDIUM:'ELEVATED', CRITICAL:'CRITICAL'};
+    pill.textContent = 'SYSTEM: '+labelMap[worstSt];
+    pill.className = worstSt;
+  }
+
+  // ---------------- canvas map ----------------
+  const mapCanvas = document.getElementById('map');
+  const mctx = mapCanvas.getContext('2d');
+  const W = mapCanvas.width, H = mapCanvas.height;
+  const nodeW = 138, nodeH = 96, cy = H/2 - 6;
+  const margin = 110;
+  const centers = zones.map((z,i)=> margin + i*((W-2*margin)/(zones.length-1)));
+
+  const flowDots = []; // {from, to, progress, speed}
+
+  function spawnFlowDot(i){
+    if(i>=zones.length-1) return;
+    if(Math.random() < 0.6){
+      flowDots.push({from:i, to:i+1, p:0, sp: 0.012 + Math.random()*0.01});
+    }
+  }
+
+  function drawIcon(kind, x, y){
+    mctx.save();
+    mctx.translate(x,y);
+    mctx.strokeStyle = 'rgba(26,31,41,0.6)';
+    mctx.lineWidth = 1.6;
+    mctx.beginPath();
+    if(kind==='entrance'){
+      mctx.moveTo(-8,8); mctx.lineTo(-8,-8); mctx.lineTo(4,-8);
+      mctx.moveTo(-2,0); mctx.lineTo(9,0);
+      mctx.moveTo(4,-4); mctx.lineTo(9,0); mctx.lineTo(4,4);
+    } else if(kind==='checkin'){
+      mctx.rect(-10,-2,20,8);
+      mctx.moveTo(-6,-2); mctx.lineTo(-6,-7); mctx.lineTo(6,-7); mctx.lineTo(6,-2);
+    } else if(kind==='security'){
+      mctx.moveTo(0,-9); mctx.lineTo(8,-5); mctx.lineTo(8,3);
+      mctx.quadraticCurveTo(8,9,0,9); mctx.quadraticCurveTo(-8,9,-8,3);
+      mctx.lineTo(-8,-5); mctx.closePath();
+    } else if(kind==='immigration'){
+      mctx.rect(-8,-9,16,18);
+      mctx.moveTo(-4,-3); mctx.arc(0,-3,3,0,Math.PI*2);
+      mctx.moveTo(-5,6); mctx.lineTo(5,6);
+    } else if(kind==='gate'){
+      mctx.moveTo(-9,6); mctx.lineTo(0,-8); mctx.lineTo(9,6);
+      mctx.lineTo(4,6); mctx.lineTo(0,-1); mctx.lineTo(-4,6); mctx.closePath();
+    }
+    mctx.stroke();
+    mctx.restore();
+  }
+
+  function drawMap(){
+    mctx.clearRect(0,0,W,H);
+
+    // background grid
+    mctx.strokeStyle = 'rgba(0,0,0,0.04)';
+    mctx.lineWidth=1;
+    for(let x=0;x<W;x+=40){ mctx.beginPath(); mctx.moveTo(x,0); mctx.lineTo(x,H); mctx.stroke(); }
+    for(let y=0;y<H;y+=40){ mctx.beginPath(); mctx.moveTo(0,y); mctx.lineTo(W,y); mctx.stroke(); }
+
+    // connective flow lines
+    for(let i=0;i<zones.length-1;i++){
+      mctx.beginPath();
+      mctx.moveTo(centers[i]+nodeW/2, cy);
+      mctx.lineTo(centers[i+1]-nodeW/2, cy);
+      mctx.setLineDash([6,6]);
+      mctx.lineDashOffset = -(performance.now()/40)%12;
+      mctx.strokeStyle = 'rgba(14,165,160,0.35)';
+      mctx.lineWidth=1.4;
+      mctx.stroke();
+      mctx.setLineDash([]);
+    }
+
+    // flow dots
+    for(let i=flowDots.length-1;i>=0;i--){
+      const d = flowDots[i];
+      d.p += d.sp;
+      if(d.p>=1){ flowDots.splice(i,1); continue; }
+      const x1 = centers[d.from]+nodeW/2, x2 = centers[d.to]-nodeW/2;
+      const x = x1 + (x2-x1)*d.p;
+      mctx.beginPath();
+      mctx.arc(x, cy + Math.sin(d.p*Math.PI)*10, 3, 0, Math.PI*2);
+      mctx.fillStyle = '#0EA5A0';
+      mctx.shadowColor='#0EA5A0'; mctx.shadowBlur=6;
+      mctx.fill();
+      mctx.shadowBlur=0;
+    }
+
+    // nodes
+    zones.forEach((z,i)=>{
+      const occ = z.queue/z.capacity;
+      const st = statusOf(occ);
+      const col = statusColor[st];
+      const x = centers[i]-nodeW/2, y = cy - nodeH/2;
+
+      if(st==='CRITICAL'){
+        const glow = 6 + Math.sin(performance.now()/180)*4;
+        mctx.save();
+        mctx.shadowColor = col; mctx.shadowBlur = glow*3;
+        roundRect(mctx, x,y,nodeW,nodeH,12);
+        mctx.fillStyle='rgba(220,38,38,0.05)'; mctx.fill();
+        mctx.restore();
+      }
+
+      roundRect(mctx, x,y,nodeW,nodeH,12);
+      mctx.fillStyle = '#FFFFFF';
+      mctx.fill();
+      mctx.lineWidth = 1.6;
+      mctx.strokeStyle = col;
+      mctx.stroke();
+
+      drawIcon(z.icon, centers[i], y+22);
+
+      mctx.fillStyle = 'rgba(26,31,41,0.9)';
+      mctx.font = '600 12px Inter, sans-serif';
+      mctx.textAlign='center';
+      mctx.fillText(z.name, centers[i], y+46);
+
+      mctx.font = '600 15px Inter, sans-serif';
+      mctx.fillStyle = col;
+      mctx.fillText(`${Math.round(z.queue)}/${z.capacity}`, centers[i], y+66);
+
+      mctx.font = '500 9px Inter, sans-serif';
+      mctx.fillStyle = 'rgba(104,112,127,0.9)';
+      mctx.fillText(st, centers[i], y+80);
+
+      // occupancy bar under node
+      const bw = nodeW-20;
+      mctx.fillStyle='rgba(0,0,0,0.07)';
+      mctx.fillRect(centers[i]-bw/2, y+nodeH+8, bw, 4);
+      mctx.fillStyle = col;
+      mctx.fillRect(centers[i]-bw/2, y+nodeH+8, bw*Math.min(1,occ), 4);
+
+      // action flash badge
+      if(z.flash && t < z.flash.until){
+        const label = z.flash.type==='lane' ? '🚦 LANE+' : z.flash.type==='staff' ? '👥 STAFF+' : '↪ DIVERT';
+        mctx.font = '600 9.5px Inter, sans-serif';
+        const tw = mctx.measureText(label).width+14;
+        mctx.fillStyle='rgba(14,165,160,0.12)';
+        roundRect(mctx, centers[i]-tw/2, y-30, tw, 18, 9);
+        mctx.fill();
+        mctx.strokeStyle='rgba(14,165,160,0.6)'; mctx.lineWidth=1; mctx.stroke();
+        mctx.fillStyle='#0B7C78';
+        mctx.fillText(label, centers[i], y-17);
+      }
+    });
+  }
+
+  function roundRect(ctx,x,y,w,h,r){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r);
+    ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r);
+    ctx.closePath();
+  }
+
+  // ---------------- main loop ----------------
+  let lastFrame = performance.now();
+  let domAccum = 0;
+  let lastCarrySnapshot = zones.map(z=>z.queue);
+
+  function frame(now){
+    const dtReal = Math.min(0.1,(now-lastFrame)/1000);
+    lastFrame = now;
+
+    if(playing){
+      const dtSim = dtReal*speed*SIM_MIN_PER_REAL_SEC;
+      const before = zones.map(z=>z.queue);
+      tick(dtSim);
+      zones.forEach((z,i)=>{ if(z.queue < before[i]-0.4) spawnFlowDot(i); });
+      domAccum += dtReal;
+    }
+
+    drawMap();
+
+    if(domAccum > 0.25 || !playing){
+      domAccum = 0;
+      renderZoneList();
+      const {st} = renderPriority();
+      renderHeader(st);
+    }
+
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // ---------------- controls ----------------
+  document.getElementById('btnPlay').addEventListener('click', function(){
+    playing = !playing;
+    this.textContent = playing ? '⏸ Pause' : '▶ Resume';
+  });
+  document.querySelectorAll('.speedBtn').forEach(b=>{
+    b.addEventListener('click', function(){
+      document.querySelectorAll('.speedBtn').forEach(x=>x.classList.remove('active'));
+      this.classList.add('active');
+      speed = parseFloat(this.dataset.speed);
+    });
+  });
+  document.getElementById('btnSurge').addEventListener('click', function(){
+    surgeUntil = t + 12;
+    pushLog('✈', 'Flight-side model predicts a wave of arrivals — inbound rate surging for 12 min.');
+  });
+  document.getElementById('btnReset').addEventListener('click', function(){
+    zones[0].queue=38; zones[1].queue=108; zones[2].queue=187; zones[3].queue=32; zones[4].queue=58;
+    zones.forEach(z=>{ z.boostMult=1; z.boostUntil=0; z.lastActionTime=-999; z.lastActionType=null;
+      z.divertFactor=0; z.divertUntil=0; z.history=[]; z.flash=null; });
+    boarded=0; redirectedTotal=0; surgeUntil=0;
+    Object.keys(actionCounts).forEach(k=>actionCounts[k]=0);
+    document.getElementById('tLane').textContent='0';
+    document.getElementById('tRedirect').textContent='0';
+    document.getElementById('tStaff').textContent='0';
+    document.getElementById('log').innerHTML = '<div class="log-empty">Monitoring zones… actions will appear here.</div>';
+  });
+
+})();
+</script>
+</body>
+</html>
